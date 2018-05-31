@@ -15,6 +15,52 @@ describe AwesomeSpawn do
       subject.send(run_method, "true", :params => {:user => "bob"}, :env => {"VAR" => "x"})
     end
 
+    it "supports option :pipe with nested cmd_str and :params" do
+      options = {
+        :params => {:foo => "foo", :bar => "bar"},
+        :pipe   => [
+          "true",
+          {
+            :params => { :arg1 => "one", :"no-arg2" => nil }
+          }
+        ]
+      }
+      expected_cmd = "true --foo foo --bar bar | true --arg1 one --no-arg2"
+      allow(subject).to receive(:launch).with({}, expected_cmd, {}).and_return(["", "", 0])
+      subject.send(run_method, "true", options)
+    end
+
+    it "supports nested pipes" do
+      options = {
+        :pipe => [
+          "cat", {
+            :pipe => [
+              "wc", {
+                :params => {:c => nil},
+                :pipe   => [
+                  "tr", {
+                    :params => [:d, '" "']
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      expected_cmd = 'echo hello world | cat | wc -c | tr -d \\"\\ \\"'
+      allow(subject).to receive(:launch).with({}, expected_cmd, {}).and_return(["", "", 0])
+      subject.send(run_method, "echo hello world", options)
+    end
+
+    it "supports pipe as a single string" do
+      options = {
+        :pipe => "true --foo foo --bar bar | true --no-args"
+      }
+      expected_cmd = "true | true --foo foo --bar bar | true --no-args"
+      allow(subject).to receive(:launch).with({}, expected_cmd, {}).and_return(["", "", 0])
+      subject.send(run_method, "true", options)
+    end
+
     it "wont modify passed in options" do
       options      = {:params => {:user => "bob"}}
       orig_options = options.dup

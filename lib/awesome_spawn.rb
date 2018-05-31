@@ -56,6 +56,19 @@ module AwesomeSpawn
   #   result.output
   #   => "ABC=abcde\n"
   #
+  #
+  # @example With pipes
+  #   result = AwesomeSpawn.run('echo hello world', :pipe => "cat | wc -c | tr -d ' '"
+  #   => #<AwesomeSpawn::CommandResult:0x007f9421a35590 @exit_status=0>
+  #   result.output        # => "12"
+  #   result.command_line  # => "echo hello world | cat | wc -c | tr -d ' '"
+  #
+  #   hash_pipe = ["cat", {:pipe => ["wc", {:params => {:c => nil}, :pipe => ["tr", {:params => [:d, " "]}]}]}]
+  #   result2   = AwesomeSpawn.run('echo hello world', :pipe => hash_pipe
+  #   => #<AwesomeSpawn::CommandResult:0x007f9421a35590 @exit_status=0>
+  #   result2.output        # => "12"
+  #   result2.command_line  # => "echo hello world | cat | wc -c | tr -d \\\"\\ \\\""
+  #
   # @param [String] command The command to run
   # @param [Hash] options The options for running the command.  Also accepts any
   #   option that can be passed to Kernel.spawn, except `:in`, `:out` and `:err`.
@@ -123,8 +136,14 @@ module AwesomeSpawn
   def parse_command_options(command, options)
     options = options.dup
     params  = options.delete(:params)
-    env = options.delete(:env) || {}
+    env     = options.delete(:env) || {}
+    cmd_str = build_command_line(command, params)
 
-    [env, build_command_line(command, params), options]
+    if pipe = options.delete(:pipe)
+      pipe = Array(pipe)
+      cmd_str << " | " << parse_command_options(pipe[0], (pipe[1] || {}))[1]
+    end
+
+    [env, cmd_str, options]
   end
 end
